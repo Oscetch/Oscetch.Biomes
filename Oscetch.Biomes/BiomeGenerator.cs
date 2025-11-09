@@ -3,6 +3,7 @@
     public class BiomeGenerator<T>(GeneratorConfiguration<T> configuration) where T: IBiomePlaceableItem
     {
         private readonly GeneratorConfiguration<T> _configuration = configuration;
+        public readonly Random _random = new(configuration.Seed);
 
         public Dictionary<BiomeLayer, Dictionary<Position, T>> Run(IReadOnlyList<Position> positions) => RunWithIterations(positions).Last();
         public Dictionary<BiomeLayer, Dictionary<Position, T>> RunForSize(int width, int height) => RunForSizeWithIterations(width, height).Last();
@@ -10,25 +11,39 @@
         public IEnumerable<Dictionary<BiomeLayer, Dictionary<Position, T>>> RunWithIterations(IReadOnlyList<Position> positions) 
         {
             Dictionary<Position, BiomeConfiguration<T>> layerMap = [];
-            InitializeMap(layerMap, _configuration.Biomes, positions, true);
-
-            var groups = layerMap.Values.GroupBy(x => x.Id);
+            var sortedBiomes = _configuration.Biomes
+                .OrderBy(x => x.InitialCreationChance)
+                .ThenBy(x => x.Id).ToList();
+            InitializeMap(layerMap, sortedBiomes, positions, true);
 
             for (var i = 0; i < _configuration.NumberOfSimulations; i++) 
             {
-                var newMap = Simulate(layerMap, _configuration.Biomes, positions);
-                groups = newMap.Values.GroupBy(x => x.Id);
+                var newMap = Simulate(layerMap, sortedBiomes, positions);
                 layerMap = newMap;
             }
 
             var biomeGroups = layerMap.GroupBy(x => x.Value.Id);
+            var map = new Dictionary<BiomeLayer, Dictionary<Position, T>>();
             foreach (var biomeGroup in biomeGroups) 
             {
                 var biomePositions = biomeGroup.Select(x => x.Key).ToList();
                 var biome = biomeGroup.First().Value;
                 foreach (var sim in PopulateBiomes(biomePositions, biome)) 
                 {
-                    yield return sim;
+                    foreach (var layer in sim.Keys) 
+                    {
+                        var simLayer = sim[layer];
+                        if (!map.TryGetValue(layer, out var mapLayer)) 
+                        {
+                            mapLayer = [];
+                            map.Add(layer, mapLayer);
+                        }
+                        foreach (var position in simLayer.Keys) 
+                        {
+                            mapLayer[position] = simLayer[position];
+                        }
+                    }
+                    yield return map;
                 }
             }
         }
@@ -53,7 +68,11 @@
 
             foreach (var layerMap in layerMaps) 
             {
-                InitializeMap(layerMap.Value, configuration.LayerItems[layerMap.Key], positions, layerMap.Key.IsFillLayer);
+                var sortedPool = configuration.LayerItems[layerMap.Key]
+                    .OrderBy(x => x.InitialCreationChance)
+                    .ThenBy(x => x.Id).ToList();
+
+                InitializeMap(layerMap.Value, sortedPool, positions, layerMap.Key.IsFillLayer);
             }
 
             for (var i = 0; i < configuration.NumberOfSimulations; i++)
@@ -61,7 +80,11 @@
                 Dictionary<BiomeLayer, Dictionary<Position, T>> newMaps = [];
                 foreach (var map in layerMaps) 
                 {
-                    newMaps[map.Key] = Simulate(map.Value, configuration.LayerItems[map.Key], positions);
+                    var sortedPool = configuration.LayerItems[map.Key]
+                        .OrderBy(x => x.InitialCreationChance)
+                        .ThenBy(x => x.Id).ToList();
+
+                    newMaps[map.Key] = Simulate(map.Value, sortedPool, positions);
                 }
                 layerMaps = newMaps;
                 yield return newMaps;
@@ -101,23 +124,34 @@
 
         private void InitializeMap<TInitItem>(Dictionary<Position, TInitItem> map, IReadOnlyList<TInitItem> pool, IReadOnlyList<Position> positions, bool shouldFill) where TInitItem : IBiomeItem
         {
-            var random = new Random(_configuration.Seed);
-            var orderedPool = pool.OrderBy(x => x.InitialCreationChance).ToList();
-
             if (shouldFill)
             {
                 foreach (var position in positions)
                 {
-                    while (!TryAdd(position, map, orderedPool, random)) ;
+                    while (!TryAdd(position, map, pool)) ;
                 }
             }
             else 
             {
                 foreach (var position in positions)
                 {
-                    TryAdd(position, map, orderedPool, random);
+                    TryAdd(position, map, pool);
                 }
             }
+        }
+        private bool TryAdd<TAddItem>(Position position, Dictionary<Position, TAddItem> map, IReadOnlyList<TAddItem> pool) where TAddItem : IBiomeItem
+        {
+            foreach (var option in pool)
+            {
+                if (_random.NextDouble() > option.InitialCreationChance)
+                {
+                    continue;
+                }
+
+                map.Add(position, option);
+                return true;
+            }
+            return false;
         }
 
         private static IEnumerable<TNeighborItem> GetNeighbors<TNeighborItem>(Position position, Dictionary<Position, TNeighborItem> map) where TNeighborItem : IBiomeItem 
@@ -143,21 +177,6 @@
                     yield return new Position(neighborX, neighborY);
                 }
             }
-        }
-
-        private static bool TryAdd<TAddItem>(Position position, Dictionary<Position, TAddItem> map, IReadOnlyList<TAddItem> pool, Random random) where TAddItem : IBiomeItem
-        {
-            foreach (var option in pool)
-            {
-                if (random.NextDouble() > option.InitialCreationChance)
-                {
-                    continue;
-                }
-
-                map.Add(position, option);
-                return true;
-            }
-            return false;
         }
     }
 }

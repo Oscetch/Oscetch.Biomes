@@ -66,7 +66,8 @@ namespace BiomeTester
                 foreach (var map in generator.RunForSizeWithIterations(100, 100))
                 {
                     Thread.Sleep(1000);
-                    BeginInvoke(() => drawControl1.Map = map);
+                    var m = map.ToDictionary(x => x.Key, x => x.Value.ToDictionary());
+                    BeginInvoke(() => drawControl1.Map = m);
                     //drawControl1.Map = map;
                 }
 
@@ -93,6 +94,7 @@ namespace BiomeTester
                 NumberOfSimulations = _config.NumberOfSimulations,
                 Seed = _config.Seed,
             };
+            biomes.Items.Clear();
             foreach (var b in newList)
             {
                 biomes.Items.Add(b);
@@ -111,6 +113,7 @@ namespace BiomeTester
                     NumberOfSimulations = _config.NumberOfSimulations,
                     Seed = _config.Seed,
                 };
+                biomes.Items.Clear();
                 foreach (var b in newList)
                 {
                     biomes.Items.Add(b);
