@@ -37,8 +37,8 @@
 
             var expectedPositions = 100 * 100;
 
-            Assert.AreEqual(aResult.Count, 1);
-            Assert.AreEqual(bResult.Count, 1);
+            Assert.AreEqual(1, aResult.Count);
+            Assert.AreEqual(1, bResult.Count);
 
             foreach (var key in aResult.Keys) 
             {
