@@ -5,9 +5,25 @@
         private readonly GeneratorConfiguration<T> _configuration = configuration;
         public readonly Random _random = new(configuration.Seed);
 
+        /// <summary>
+        /// Generates a map on the given positions
+        /// </summary>
+        /// <param name="positions">The positions where you want to generate the map on</param>
+        /// <returns>A finished map, grouped by biome layers</returns>
         public Dictionary<BiomeLayer, Dictionary<Position, T>> Run(IReadOnlyList<Position> positions) => RunWithIterations(positions).Last();
+        /// <summary>
+        /// Generates a map with the provided width and height
+        /// </summary>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <returns>A finished map, grouped by biome layers</returns>
         public Dictionary<BiomeLayer, Dictionary<Position, T>> RunForSize(int width, int height) => RunForSizeWithIterations(width, height).Last();
 
+        /// <summary>
+        /// Generates a map on the given positions and yields each generation of the simulation
+        /// </summary>
+        /// <param name="positions">The positions where you want to generate the map on</param>
+        /// <returns>Each generation of the map on the provided positions</returns>
         public IEnumerable<Dictionary<BiomeLayer, Dictionary<Position, T>>> RunWithIterations(IReadOnlyList<Position> positions) 
         {
             Dictionary<Position, BiomeConfiguration<T>> layerMap = [];
@@ -43,11 +59,16 @@
                             mapLayer[position] = simLayer[position];
                         }
                     }
-                    yield return map;
+                    yield return map.ToDictionary(x => x.Key, x => new Dictionary<Position, T>(x.Value));
                 }
             }
         }
-
+        /// <summary>
+        /// Generates a map with the provided width and height, and yields each generation of the simulation
+        /// </summary>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <returns>Each generation of the map on the provided width and height</returns>
         public IEnumerable<Dictionary<BiomeLayer, Dictionary<Position, T>>> RunForSizeWithIterations(int width, int height) 
         {
             var positions = new List<Position>();
